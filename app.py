@@ -1229,6 +1229,112 @@ else:
             save_manager_config(cfg)
 
             st.success(f"成员已保存，绑定方案：{scheme_to_use}")
+    # ================== 🛠 方案管理（管理员专用） ==================
+    st.subheader("🛠 管理考核方案（新增 / 修改 / 删除）")
+
+    schemes = load_schemes()
+    scheme_names = list(schemes.keys())
+
+    # --- 显示当前所有方案 ---
+    st.markdown("### 📚 当前方案列表")
+    schemes_table = []
+    for name, sch in schemes.items():
+        schemes_table.append({
+            "方案名": name,
+            "每日视频目标": sch["daily_target"],
+            "平均播放合格": sch["avg_views_standard"],
+            "月销售合格": sch["monthly_sales_standard"],
+            "权重：执行力": sch["weight_exec"],
+            "权重：内容吸引力": sch["weight_view"],
+            "权重：商业产出": sch["weight_sale"],
+            "本周上班天数": sch["work_days_week"],
+            "本月上班天数": sch["work_days_month"],
+        })
+    st.dataframe(pd.DataFrame(schemes_table), use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("### ➕ 新增方案 / 修改方案")
+
+    # 输入方案名称（新增或选择已有方案）
+    mode = st.radio("选择操作方式", ["新增方案", "修改已有方案"])
+
+    if mode == "新增方案":
+        new_scheme_name = st.text_input("方案名称（例如：新员工首月 / 带货专项 / 老员工绩效）")
+        selected_scheme = None
+    else:
+        selected_scheme = st.selectbox("选择要修改的方案", scheme_names)
+        new_scheme_name = selected_scheme
+
+    # 如果是修改，加载已有方案，否则给默认
+    if selected_scheme:
+        data = schemes[selected_scheme]
+    else:
+        data = {
+            "daily_target": 10,
+            "avg_views_standard": 500,
+            "monthly_sales_standard": 200,
+            "weight_exec": 60,
+            "weight_view": 20,
+            "weight_sale": 20,
+            "work_days_week": 5,
+            "work_days_month": 22,
+        }
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        daily_target_i = st.number_input("每日视频目标", 1, 100, data["daily_target"])
+        avg_views_standard_i = st.number_input("平均播放合格（次）", 10, 50000, data["avg_views_standard"])
+    with c2:
+        monthly_sales_standard_i = st.number_input("月销售额合格（$）", 0.0, 100000.0, data["monthly_sales_standard"])
+        work_days_week_i = st.number_input("本周上班天数", 1, 7, data["work_days_week"])
+    with c3:
+        work_days_month_i = st.number_input("本月上班天数", 1, 31, data["work_days_month"])
+        weight_exec_i = st.number_input("执行力权重 (%)", 0, 100, data["weight_exec"])
+        weight_view_i = st.number_input("内容吸引力权重 (%)", 0, 100, data["weight_view"])
+        weight_sale_i = st.number_input("商业产出权重 (%)", 0, 100, data["weight_sale"])
+
+    if weight_exec_i + weight_view_i + weight_sale_i != 100:
+        st.error("⚠️ 三项权重之和必须等于 100%！")
+
+    # 保存方案
+    if st.button("💾 保存此方案", use_container_width=True):
+        if not new_scheme_name:
+            st.warning("方案名称不能为空！")
+        elif weight_exec_i + weight_view_i + weight_sale_i != 100:
+            st.warning("权重之和必须等于100%。")
+        else:
+            schemes[new_scheme_name] = {
+                "daily_target": int(daily_target_i),
+                "avg_views_standard": int(avg_views_standard_i),
+                "monthly_sales_standard": float(monthly_sales_standard_i),
+                "work_days_week": int(work_days_week_i),
+                "work_days_month": int(work_days_month_i),
+                "weight_exec": int(weight_exec_i),
+                "weight_view": int(weight_view_i),
+                "weight_sale": int(weight_sale_i),
+            }
+            save_schemes(schemes)
+            st.success(f"方案《{new_scheme_name}》已保存！")
+
+    # 删除方案
+    st.markdown("---")
+    st.markdown("### 🗑 删除方案")
+
+    del_scheme = st.selectbox("选择要删除的方案", ["（请选择）"] + scheme_names)
+
+    if del_scheme != "（请选择）":
+        if st.button("⚠️ 删除该方案", use_container_width=True):
+            if del_scheme in schemes:
+                if len(schemes) == 1:
+                    st.error("系统至少要保留 1 个方案，不能全部删除！")
+                else:
+                    schemes.pop(del_scheme)
+                    save_schemes(schemes)
+                    st.success(f"方案《{del_scheme}》已被删除！")
+            else:
+                st.error("方案不存在。")
+
+            
 
 
 
