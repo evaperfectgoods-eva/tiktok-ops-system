@@ -1281,20 +1281,64 @@ else:
         }
 
     c1, c2, c3 = st.columns(3)
+
     with c1:
-        avg_views_standard_i = st.number_input("平均播放合格（次）",min_value=10.0,max_value=50000.0,value=float(data["avg_views_standard"])
-        daily_target_i = st.number_input("每日视频目标",min_value=1.0,max_value=100.0,value=float(data["daily_target"])
+        avg_views_standard_i = st.number_input(
+            "平均播放合格（次）",
+            min_value=10.0,
+            max_value=50000.0,
+            value=float(data["avg_views_standard"])
+        )
+        daily_target_i = st.number_input(
+            "每日视频目标",
+            min_value=1.0,
+            max_value=100.0,
+            value=float(data["daily_target"])
+        )
+
     with c2:
-        monthly_sales_standard_i = st.number_input( "月销售额合格（$）", min_value=0.0,max_value=100000.0, value=float(data["monthly_sales_standard"])
-        work_days_week_i = st.number_input("本周上班天数", 1, 7, data["work_days_week"])
+        monthly_sales_standard_i = st.number_input(
+            "月销售额合格（$）",
+            min_value=0.0,
+            max_value=100000.0,
+            value=float(data["monthly_sales_standard"])
+        )
+        work_days_week_i = st.number_input(
+            "本周上班天数",
+            min_value=1,
+            max_value=7,
+            value=int(data["work_days_week"])
+        )
+
     with c3:
-        work_days_month_i = st.number_input("本月上班天数", 1, 31, data["work_days_month"])
-        weight_exec_i = st.number_input("执行力权重 (%)", 0, 100, data["weight_exec"])
-        weight_view_i = st.number_input("内容吸引力权重 (%)", 0, 100, data["weight_view"])
-        weight_sale_i = st.number_input("商业产出权重 (%)", 0, 100, data["weight_sale"])
+        work_days_month_i = st.number_input(
+            "本月上班天数",
+            min_value=1,
+            max_value=31,
+            value=int(data["work_days_month"])
+        )
+        weight_exec_i = st.number_input(
+            "执行力权重（%）",
+            min_value=0,
+            max_value=100,
+            value=int(data["weight_exec"])
+        )
+        weight_view_i = st.number_input(
+            "内容吸引力权重（%）",
+            min_value=0,
+            max_value=100,
+            value=int(data["weight_view"])
+        )
+        weight_sale_i = st.number_input(
+            "商业产出权重（%）",
+            min_value=0,
+            max_value=100,
+            value=int(data["weight_sale"])
+        )
 
     if weight_exec_i + weight_view_i + weight_sale_i != 100:
-        st.error("⚠️ 三项权重之和必须等于 100%！")
+        st.error("⚠ 三项权重之和必须等于 100%！")
+
 
     # 保存方案
     if st.button("💾 保存此方案", use_container_width=True):
