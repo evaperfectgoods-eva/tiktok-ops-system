@@ -650,7 +650,7 @@ else:
         ]
 
     st.dataframe(
-        df_filtered.sort_values("日期", descending=False),
+        df_filtered.sort_values("日期", ascending=False),
         use_container_width=True
     )
 
