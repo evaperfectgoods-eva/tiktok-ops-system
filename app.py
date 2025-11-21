@@ -3,18 +3,35 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
+import os
+import json
 
 DATA_FILE = "tiktok_data.xlsx"
+MANAGER_CONFIG_FILE = "manager_config.json"
 
-# ================== 管理员 / 成员密码配置 ==================
-# 在这里配置你们团队的账号和密码
-# role: "admin" 可以编辑/删除所有人的记录；"member" 只能操作自己的记录
-MANAGER_CONFIG = {
-    "admin": {"password": "admin123", "role": "admin"},      # 管理员示例
-    "小A": {"password": "a123456", "role": "member"},        # 成员示例
-    "小B": {"password": "b123456", "role": "member"},        # 成员示例
-    # 按需继续添加...
-}
+# ================== 团队权限配置（动态管理） ==================
+def save_manager_config(cfg: dict):
+    """把权限配置写入 json 文件"""
+    with open(MANAGER_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+def load_manager_config():
+    """从本地 json 文件加载权限配置。如果不存在则创建默认管理员。"""
+    if os.path.exists(MANAGER_CONFIG_FILE):
+        try:
+            with open(MANAGER_CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
+    # 默认配置：你的管理员 + 一个成员
+    default_cfg = {
+        "周艺文": {"password": "zyw594", "role": "admin"},
+        "廖秉杰": {"password": "lbj168", "role": "member"},
+    }
+    save_manager_config(default_cfg)
+    return default_cfg
 
 
 # ================== 数据工具函数 ==================
@@ -486,15 +503,17 @@ if "auth_user" not in st.session_state:
     st.session_state["auth_user"] = None
     st.session_state["auth_role"] = None
 
-input_user = st.sidebar.text_input("登录名（建议与运营人员一致）")
-input_pwd = st.sidebar.text_input("管理密码", type="password")
+manager_config = load_manager_config()
+
+login_user = st.sidebar.text_input("登录名（与运营人员一致）")
+login_pwd = st.sidebar.text_input("管理密码", type="password")
 
 if st.sidebar.button("登录 / 切换用户"):
-    info = MANAGER_CONFIG.get(input_user)
-    if info and input_pwd == info["password"]:
-        st.session_state["auth_user"] = input_user
+    info = manager_config.get(login_user)
+    if info and login_pwd == info["password"]:
+        st.session_state["auth_user"] = login_user
         st.session_state["auth_role"] = info["role"]
-        st.sidebar.success(f"已登录：{input_user}（角色：{info['role']}）")
+        st.sidebar.success(f"已登录：{login_user}（角色：{info['role']}）")
     else:
         st.session_state["auth_user"] = None
         st.session_state["auth_role"] = None
@@ -631,7 +650,7 @@ else:
         ]
 
     st.dataframe(
-        df_filtered.sort_values("日期", ascending=False),
+        df_filtered.sort_values("日期", descending=False),
         use_container_width=True
     )
 
@@ -731,18 +750,15 @@ else:
                 save_data(df)
                 st.warning(f"记录 ID {selected_id} 已删除。请刷新页面或重新运行应用。")
 
-    # ===== 各类汇总 & 图表 =====
-    # 每日汇总
+    # ===== 每日/每周/每月汇总 & 图表 =====
     st.header("📆 每日汇总（Daily Summary）")
     summary_day = summarize_by_date(df_filtered)
     st.dataframe(summary_day.sort_values("日期"), use_container_width=True)
 
-    # 每周汇总（整体）
     st.header("📦 每周汇总（团队整体 Weekly Summary）")
     summary_week = summarize_by_week(df_filtered)
     st.dataframe(summary_week.sort_values("周起始日"), use_container_width=True)
 
-    # 每周汇总（按人员）
     st.subheader("👥 每周汇总（按运营人员）")
     summary_week_person = summarize_by_week_and_person(df_filtered)
     if summary_week_person.empty:
@@ -763,12 +779,10 @@ else:
         file_name="weekly_report.txt",
     )
 
-    # 每月汇总（整体）
     st.header("🗓 每月汇总（团队整体 Monthly Summary）")
     summary_month = summarize_by_month(df_filtered)
     st.dataframe(summary_month.sort_values("月份"), use_container_width=True)
 
-    # 每月汇总（按人员）
     st.subheader("👥 每月汇总（按运营人员）")
     summary_month_person = summarize_by_month_and_person(df_filtered)
     if summary_month_person.empty:
@@ -779,31 +793,23 @@ else:
             use_container_width=True
         )
 
-    # 趋势图（用每日数据）
     if not summary_day.empty:
         st.subheader("📈 趋势图（按天）")
         col_a, col_b = st.columns(2)
-
         with col_a:
             st.markdown("**每日播放总量**")
             st.line_chart(summary_day.set_index("日期")["播放7日合计"])
-
             st.markdown("**每日新增粉丝**")
             st.bar_chart(summary_day.set_index("日期")["新增粉丝合计"])
-
         with col_b:
             st.markdown("**加权完播率(%)**")
             st.line_chart(summary_day.set_index("日期")["完播率_加权(%)"])
-
             st.markdown("**加权互动率(%)**")
             st.line_chart(summary_day.set_index("日期")["互动率_加权(%)"])
 
-    # 团队运营建议
     st.header("🧠 团队运营分析 & 建议（基于当前筛选数据）")
     detail = generate_suggestions_detailed(df_filtered, daily_target=daily_target)
-
     col_g, col_s, col_p = st.columns(3)
-
     with col_g:
         st.subheader("✅ 优势亮点")
         if detail["优势亮点"]:
@@ -811,7 +817,6 @@ else:
                 st.markdown(f"- {s}")
         else:
             st.markdown("- 暂未体现明显优势，多积累一些数据后再评估。")
-
     with col_s:
         st.subheader("📌 需要加强")
         if detail["需要加强"]:
@@ -819,7 +824,6 @@ else:
                 st.markdown(f"- {s}")
         else:
             st.markdown("- 当前维度整体中规中矩，可根据团队目标再细化。")
-
     with col_p:
         st.subheader("⚠️ 存在问题 & 改进方向")
         if detail["存在问题"]:
@@ -842,18 +846,62 @@ else:
             weight_view=weight_view,
             weight_sale=weight_sale,
         )
-
         if isinstance(evaluation, str):
             st.info(evaluation)
         else:
             st.subheader(evaluation["最终结论"])
             st.write(f"- 最近统计月份：{evaluation['最近月份'].strftime('%Y-%m')}")
             st.write(f"- 综合得分：{evaluation['综合得分']} 分")
-
             st.markdown("**维度表现（团队整体）：**")
             st.write(f"• 执行力：{evaluation['执行力等级']}（{evaluation['执行力得分']} 分），月日均视频数：{evaluation['月日均视频数']} 条/天")
             st.write(f"• 内容吸引力：{evaluation['内容吸引力等级']}（{evaluation['内容吸引力得分']} 分），月平均播放：{evaluation['月平均播放']} 次/条")
             st.write(f"• 商业产出：{evaluation['商业产出等级']}（{evaluation['商业产出得分']} 分），月总销售额：${evaluation['月总销售额']}")
+
+    # ================== 团队权限管理（仅管理员可见） ==================
+    st.header("👥 团队权限管理（管理员专用）")
+    auth_role = st.session_state.get("auth_role")
+    auth_user = st.session_state.get("auth_user")
+    if auth_role != "admin":
+        st.info("只有管理员账号可以管理团队权限，请使用管理员账号在左侧登录。")
+    else:
+        st.success(f"当前管理员：{auth_user}")
+        cfg = load_manager_config()
+
+        st.subheader("成员列表")
+        members_df = pd.DataFrame(
+            [{"登录名": name, "角色": info["role"], "密码": info["password"]} for name, info in cfg.items()]
+        )
+        st.dataframe(members_df, use_container_width=True)
+
+        st.subheader("新增 / 修改成员")
+        colm1, colm2, colm3 = st.columns(3)
+        with colm1:
+            m_name = st.text_input("登录名（与运营人员一致）")
+        with colm2:
+            m_pwd = st.text_input("密码", type="password")
+        with colm3:
+            m_role = st.selectbox("角色", ["admin", "member"])
+
+        colb1, colb2 = st.columns(2)
+        with colb1:
+            if st.button("💾 保存成员（新增或覆盖）", use_container_width=True):
+                name = m_name.strip()
+                if not name or not m_pwd:
+                    st.warning("登录名和密码不能为空。")
+                else:
+                    cfg[name] = {"password": m_pwd, "role": m_role}
+                    save_manager_config(cfg)
+                    st.success(f"已保存成员：{name}（角色：{m_role}）")
+        with colb2:
+            del_name = st.selectbox("选择要删除的成员", ["（不删除）"] + list(cfg.keys()))
+            if del_name != "（不删除）":
+                if st.button("🗑 删除该成员", use_container_width=True):
+                    if del_name == auth_user:
+                        st.warning("不能删除当前登录的管理员账号。")
+                    else:
+                        cfg.pop(del_name, None)
+                        save_manager_config(cfg)
+                        st.success(f"已删除成员：{del_name}")
 
     # 个人表现分析
     st.header("👤 个人表现分析（个人周/月数据 + 雷达图）")
@@ -868,8 +916,6 @@ else:
                 st.info("当前筛选条件下，这位同事没有数据，可以放宽日期或账号筛选再试。")
             else:
                 st.subheader(f"📌 {person} 的数据概览")
-
-                # 日 / 周 / 月汇总（个人）
                 day_p = summarize_by_date(df_person)
                 week_p = summarize_by_week(df_person)
                 month_p = summarize_by_month(df_person)
@@ -882,7 +928,6 @@ else:
                     st.markdown("**个人每月汇总**")
                     st.dataframe(month_p.sort_values("月份"), use_container_width=True)
 
-                # 个人趋势图
                 if not day_p.empty:
                     st.markdown("**个人每日趋势**")
                     c1, c2 = st.columns(2)
@@ -891,7 +936,6 @@ else:
                     with c2:
                         st.line_chart(day_p.set_index("日期")["完播率_加权(%)"])
 
-                # 个人考核 & 雷达图
                 if total_weight == 100 and not month_p.empty:
                     peval = final_evaluation(
                         summary_month=month_p,
@@ -911,7 +955,6 @@ else:
                         st.write(f"- 执行力：{peval['执行力等级']}（{peval['执行力得分']} 分）")
                         st.write(f"- 内容吸引力：{peval['内容吸引力等级']}（{peval['内容吸引力得分']} 分）")
                         st.write(f"- 商业产出：{peval['商业产出等级']}（{peval['商业产出得分']} 分）")
-
                         st.markdown("**个人能力雷达图：**")
                         fig = plot_radar(
                             peval["执行力得分"],
