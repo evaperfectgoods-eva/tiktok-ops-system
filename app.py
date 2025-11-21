@@ -1034,18 +1034,27 @@ else:
     col_g, col_s, col_p = st.columns(3)
     with col_g:
         st.subheader("✅ 优势亮点")
-        for s in detail["优势亮点"]:
-            st.markdown(f"- {s}") if detail["优势亮点"] else st.markdown("- 暂无")
+        if detail["优势亮点"]:
+            for s in detail["优势亮点"]:
+             st.markdown(f"- {s}")
+        else:
+            st.markdown("- 暂无明显优势")
 
     with col_s:
         st.subheader("📌 需要加强")
-        for s in detail["需要加强"]:
-            st.markdown(f"- {s}") if detail["需要加强"] else st.markdown("- 暂无")
+        if detail["需要加强"]:
+            for s in detail["需要加强"]:
+             st.markdown(f"- {s}")
+        else:
+            st.markdown("- 暂无需要加强项")
 
     with col_p:
         st.subheader("⚠️ 存在问题 & 改进方向")
-        for s in detail["存在问题"]:
-            st.markdown(f"- {s}") if detail["存在问题"] else st.markdown("- 暂无")
+        if detail["存在问题"]:
+           for s in detail["存在问题"]:
+            st.markdown(f"- {s}")
+        else:
+            st.markdown("- 暂无明显问题")
 
     # ===== 最终录用判定 =====
     st.header("🎯 最终录用判定（基于最近一个完整月）")
@@ -1204,5 +1213,31 @@ if st.button("💾 保存成员"):
     else:
         # TODO: 这里继续写保存逻辑
         pass
+    # 🎯 给成员分配 / 调整考核方案
+    st.subheader("🎯 为成员分配考核方案")
+
+    if not cfg:
+        st.info("当前还没有任何成员，请先新增成员。")
+    else:
+        # 选择要分配方案的成员
+        select_member = st.selectbox(
+            "选择成员",
+            list(cfg.keys()),
+            format_func=lambda x: f"{x}（角色：{cfg[x].get('role', 'member')}，当前方案：{cfg[x].get('scheme', '未设置')}）"
+        )
+
+        # 选择可用方案
+        new_scheme_for_member = st.selectbox(
+            "绑定方案",
+            scheme_names,
+            index=scheme_names.index(cfg[select_member].get("scheme", scheme_names[0]))
+            if cfg[select_member].get("scheme") in scheme_names else 0
+        )
+
+        # 保存
+        if st.button("💾 保存绑定方案", use_container_width=True):
+            cfg[select_member]["scheme"] = new_scheme_for_member
+            save_manager_config(cfg)
+            st.success(f"已将成员【{select_member}】绑定为考核方案：{new_scheme_for_member}")
 
 
