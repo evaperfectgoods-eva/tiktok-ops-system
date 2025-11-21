@@ -1195,11 +1195,11 @@ else:
     )
     st.dataframe(members_df, use_container_width=True)
 
-    # 新增/修改成员
+    # 新增 / 修改成员
     st.subheader("➕ 新增 / 修改成员")
     c1, c2, c3 = st.columns(3)
     with c1:
-        m_name = st.text_input("登录名（与运营人员一致）")
+        m_name = st.text_input("账号名（与运营人员一致）")
     with c2:
         m_pwd = st.text_input("密码", type="password")
     with c3:
@@ -1207,37 +1207,28 @@ else:
 
     m_scheme = st.selectbox("绑定方案", ["（默认使用当前方案）"] + scheme_names)
 
-if st.button("💾 保存成员"):
-    if not m_name or not m_pwd:
-        st.warning("登录名与密码不能为空，请输入后再保存。")
-    else:
-        # TODO: 这里继续写保存逻辑
-        pass
-    # 🎯 给成员分配 / 调整考核方案
-    st.subheader("🎯 为成员分配考核方案")
+    if st.button("💾 保存成员"):
+        if not m_name or not m_pwd:
+            st.warning("账号名和密码不能为空，请填写后再保存。")
+        else:
+            # 1）决定要给这个成员用哪个方案
+            if m_scheme == "（默认使用当前方案）":
+                # 如果没有特别指定，就用当前登录用户的方案
+                scheme_to_use = user_scheme_name
+            else:
+                scheme_to_use = m_scheme
 
-    if not cfg:
-        st.info("当前还没有任何成员，请先新增成员。")
-    else:
-        # 选择要分配方案的成员
-        select_member = st.selectbox(
-            "选择成员",
-            list(cfg.keys()),
-            format_func=lambda x: f"{x}（角色：{cfg[x].get('role', 'member')}，当前方案：{cfg[x].get('scheme', '未设置')}）"
-        )
+            # 2）写入 / 覆盖这个成员的配置
+            cfg[m_name] = {
+                "password": m_pwd,
+                "role": m_role,
+                "scheme": scheme_to_use,
+            }
 
-        # 选择可用方案
-        new_scheme_for_member = st.selectbox(
-            "绑定方案",
-            scheme_names,
-            index=scheme_names.index(cfg[select_member].get("scheme", scheme_names[0]))
-            if cfg[select_member].get("scheme") in scheme_names else 0
-        )
-
-        # 保存
-        if st.button("💾 保存绑定方案", use_container_width=True):
-            cfg[select_member]["scheme"] = new_scheme_for_member
+            # 3）保存到 manager_config.json
             save_manager_config(cfg)
-            st.success(f"已将成员【{select_member}】绑定为考核方案：{new_scheme_for_member}")
+
+            st.success(f"成员已保存，绑定方案：{scheme_to_use}")
+
 
 
