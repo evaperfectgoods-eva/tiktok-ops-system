@@ -27,7 +27,7 @@ def load_manager_config():
 
     # 默认配置：你的管理员 + 一个成员
     default_cfg = {
-        "周艺文": {"password": "zyw594", "role": "admin"},
+        "周艺文": {"password": "zyw168", "role": "admin"},
         "廖秉杰": {"password": "lbj168", "role": "member"},
     }
     save_manager_config(default_cfg)
@@ -70,7 +70,7 @@ def add_derived_columns(df: pd.DataFrame):
     df = df.copy()
     df["互动量"] = df[["点赞", "评论", "分享"]].sum(axis=1)
     df["互动率(%)"] = df.apply(
-        lambda row: (row["互动量"] / row["播放7日"] * 100) if row["播放7日"] > 0 else 0,
+        lambda row: (df.at[row.name, "互动量"] / row["播放7日"] * 100) if row["播放7日"] > 0 else 0,
         axis=1,
     )
     return df
@@ -282,7 +282,8 @@ def generate_suggestions_detailed(df: pd.DataFrame, daily_target: int):
 # ================== 每周总结文案 ==================
 def generate_weekly_report(summary_week: pd.DataFrame,
                            summary_week_person: pd.DataFrame,
-                           daily_target: int) -> str:
+                           daily_target: int,
+                           work_days_week: int) -> str:
     if summary_week.empty:
         return "当前还没有完整一周的数据，本周总结暂时无法生成。"
 
@@ -297,7 +298,9 @@ def generate_weekly_report(summary_week: pd.DataFrame,
     finish = last_row["完播率_加权(%)"]
     eng = last_row["互动率_加权(%)"]
 
-    avg_per_day = videos / 7 if videos > 0 else 0
+    # 使用实际工作天数（适配大小周）
+    valid_days = work_days_week if work_days_week and work_days_week > 0 else 7
+    avg_per_day = videos / valid_days if videos > 0 else 0
     avg_views_per_video = views / videos if videos > 0 else 0
 
     # 找本周表现最好的人（按播放合计）
@@ -384,14 +387,14 @@ def score_level(level: str) -> int:
         return 70
     return 40  # 不及格
 
-
 def final_evaluation(summary_month: pd.DataFrame,
                      daily_target: int,
                      monthly_sales_standard: float,
                      avg_views_standard: int,
                      weight_exec: int,
                      weight_view: int,
-                     weight_sale: int):
+                     weight_sale: int,
+                     work_days_month: int):
     """基于『最近一个月』给出最终评分 + 录用建议"""
     if summary_month.empty:
         return "数据不足，建议继续观察。"
@@ -403,8 +406,10 @@ def final_evaluation(summary_month: pd.DataFrame,
     month_views_total = row["播放7日合计"]
     month_sales = row["收入合计($)"]
 
+    # 使用本月实际工作天数（适配大小周）
+    valid_month_days = work_days_month if work_days_month and work_days_month > 0 else 30
     month_views_avg = month_views_total / month_videos if month_videos > 0 else 0
-    month_video_per_day = month_videos / 30  # 简单按 30 天估算
+    month_video_per_day = month_videos / valid_month_days if valid_month_days > 0 else 0
 
     exec_level = level_from_exec(month_video_per_day, daily_target)
     view_level = level_from_views(month_views_avg, avg_views_standard)
@@ -424,7 +429,7 @@ def final_evaluation(summary_month: pd.DataFrame,
             sale_score * weight_sale
         ) / total_weight
 
-    # 综合结论（方案 A 文案）
+    # 综合结论
     if total_score >= 85:
         final_label = "🏆 重点培养（高效内容生产人才）"
     elif total_score >= 70:
@@ -478,13 +483,24 @@ st.sidebar.header("参数 & 筛选")
 # 动态考核标准
 st.sidebar.subheader("📌 考核标准设置（可随时调整）")
 daily_target = st.sidebar.number_input(
-    "每日视频目标（条）", min_value=1, max_value=100, value=8
+    "每日视频目标（条）", min_value=1, max_value=100, value=10  # 默认目标 10 条/天
 )
 monthly_sales_standard = st.sidebar.number_input(
     "月销售额合格标准（$）", min_value=10, max_value=100000, value=200
 )
 avg_views_standard = st.sidebar.number_input(
     "平均播放量合格标准（次/条）", min_value=10, max_value=100000, value=500
+)
+
+# 工作天数设置（适配大小周）
+st.sidebar.subheader("📅 工作天数设置（用于日均产量计算）")
+work_days_week = st.sidebar.number_input(
+    "本周上班天数（大小周：5 或 6）",
+    min_value=1, max_value=7, value=6
+)
+work_days_month = st.sidebar.number_input(
+    "本月上班天数（如 22 天）",
+    min_value=1, max_value=31, value=22
 )
 
 # 动态权重
@@ -533,7 +549,7 @@ col_std1, col_std2, col_std3 = st.columns(3)
 with col_std1:
     st.markdown("**执行力（视频产量）**")
     st.write(f"- 目标：{daily_target} 条/天")
-    st.write(f"- 合格：≥ {daily_target * 0.7:.1f} 条/天")
+    st.write(f"- 合格：≥ {daily_target * 0.7:.1f} 条/天（当前：≥ {daily_target * 0.7:.0f} 条/天）")
     st.write(f"- 优秀：≥ {daily_target:.1f} 条/天")
     st.write(f"- 顶尖：≥ {daily_target * 1.5:.1f} 条/天")
 
@@ -771,7 +787,12 @@ else:
 
     # 📝 自动生成本周团队总结
     st.subheader("📝 本周团队总结报告（自动生成，可复制发群）")
-    weekly_report_text = generate_weekly_report(summary_week, summary_week_person, daily_target)
+    weekly_report_text = generate_weekly_report(
+        summary_week,
+        summary_week_person,
+        daily_target,
+        work_days_week
+    )
     st.markdown(weekly_report_text)
     st.download_button(
         label="📥 下载本周总结为 TXT",
@@ -845,6 +866,7 @@ else:
             weight_exec=weight_exec,
             weight_view=weight_view,
             weight_sale=weight_sale,
+            work_days_month=work_days_month
         )
         if isinstance(evaluation, str):
             st.info(evaluation)
@@ -945,6 +967,7 @@ else:
                         weight_exec=weight_exec,
                         weight_view=weight_view,
                         weight_sale=weight_sale,
+                        work_days_month=work_days_month
                     )
                     if isinstance(peval, str):
                         st.info(peval)
@@ -962,3 +985,4 @@ else:
                             peval["商业产出得分"],
                         )
                         st.pyplot(fig)
+
