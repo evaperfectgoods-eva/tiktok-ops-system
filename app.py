@@ -1282,10 +1282,10 @@ else:
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        daily_target_i = st.number_input("每日视频目标", 1, 100, data["daily_target"])
-        avg_views_standard_i = st.number_input("平均播放合格（次）", 10, 50000, data["avg_views_standard"])
+        avg_views_standard_i = st.number_input("平均播放合格（次）",min_value=10.0,max_value=50000.0,value=float(data["avg_views_standard"])
+        daily_target_i = st.number_input("每日视频目标",min_value=1.0,max_value=100.0,value=float(data["daily_target"])
     with c2:
-        monthly_sales_standard_i = st.number_input("月销售额合格（$）", 0.0, 100000.0, data["monthly_sales_standard"])
+        monthly_sales_standard_i = st.number_input( "月销售额合格（$）", min_value=0.0,max_value=100000.0, value=float(data["monthly_sales_standard"])
         work_days_week_i = st.number_input("本周上班天数", 1, 7, data["work_days_week"])
     with c3:
         work_days_month_i = st.number_input("本月上班天数", 1, 31, data["work_days_month"])
