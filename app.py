@@ -1198,7 +1198,11 @@ else:
 
     m_scheme = st.selectbox("绑定方案", ["（默认使用当前方案）"] + scheme_names)
 
-    if st.button("💾 保存成员"):
-        if not m_name or not m_pwd:
-            st.warning("登录
+if st.button("💾 保存成员"):
+    if not m_name or not m_pwd:
+        st.warning("登录名与密码不能为空，请输入后再保存。")
+    else:
+        # TODO: 这里继续写保存逻辑
+        pass
+
 
